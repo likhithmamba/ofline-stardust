@@ -58,14 +58,40 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
         { role: 'user' as const, content: userMsg.content }
       ];
 
-      const response = await chatWithAI(apiMessages);
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+      if (window.electronAPI) {
+        // Add a placeholder message for the assistant
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+        window.electronAPI.ollama.stream(
+          { model: getSelectedModel(), messages: apiMessages },
+          (chunk: string) => {
+            setMessages(prev => {
+              const newMsgs = [...prev];
+              const lastMsg = newMsgs[newMsgs.length - 1];
+              if (lastMsg.role === 'assistant') {
+                lastMsg.content += chunk;
+              }
+              return newMsgs;
+            });
+          },
+          () => {
+            setIsLoading(false);
+          },
+          (error: string) => {
+            setMessages(prev => [...prev, { role: 'assistant', content: `⚠️ ${error}` }]);
+            setIsLoading(false);
+          }
+        );
+      } else {
+        const response = await chatWithAI(apiMessages);
+        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+        setIsLoading(false);
+      }
     } catch (err: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: `⚠️ ${err.message || 'AI error'}. Make sure Ollama is running (check Settings).`
       }]);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -100,26 +126,26 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          <div className="flex-1 overflow-y-auto p-3 space-y-4">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[90%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-purple-600/80 text-white'
-                    : 'bg-slate-800 text-slate-200 border border-slate-700'
-                }`}>
-                  {msg.content}
+                {msg.role === 'assistant' && (
+                  <div className="w-6 h-6 rounded-full bg-purple-900/50 border border-purple-500/30 flex items-center justify-center mr-2 mt-1 shrink-0">
+                    <Sparkles size={12} className="text-purple-400" />
+                  </div>
+                )}
+                <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${msg.role === 'user'
+                    ? 'bg-purple-600 text-white rounded-tr-sm'
+                    : 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-tl-sm shadow-sm'
+                  }`}>
+                  {msg.content || (isLoading && i === messages.length - 1 ? (
+                    <span className="flex items-center gap-2 text-slate-400">
+                      <Loader size={12} className="animate-spin" /> Thinking...
+                    </span>
+                  ) : null)}
                 </div>
               </div>
             ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 flex items-center gap-2">
-                  <Loader size={14} className="text-purple-400 animate-spin" />
-                  <span className="text-slate-400 text-xs">Thinking...</span>
-                </div>
-              </div>
-            )}
             <div ref={messagesEndRef} />
           </div>
 

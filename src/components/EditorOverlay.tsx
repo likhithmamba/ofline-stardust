@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { RichTextEditor } from './editor/RichTextEditor';
-import { generateContent } from '../utils/ai';
+import { getSelectedModel } from '../utils/ai';
+
+declare global {
+    interface Window {
+        electronAPI?: any;
+    }
+}
 import { Sparkles, X, Loader, GripHorizontal } from 'lucide-react';
 
 export const EditorOverlay: React.FC = () => {
@@ -25,19 +31,32 @@ export const EditorOverlay: React.FC = () => {
     const screenW = note.w * viewport.zoom;
     const screenH = note.h * viewport.zoom;
 
-    const handleSpark = async () => {
+    const handleSpark = () => {
         if (isAiLoading) return;
         setIsAiLoading(true);
-        setAiResponse(null);
-        try {
-            const result = await generateContent(
-                `Expand on this concept: "${note.title || 'Untitled'}". Keep it concise, creative, and cosmic-themed.`
+        setAiResponse('');
+        const prompt = `Expand on this concept: "${note.title || 'Untitled'}". Keep it concise, creative, and cosmic-themed.`;
+
+        if (window.electronAPI) {
+            window.electronAPI.ollama.stream(
+                { model: getSelectedModel(), prompt },
+                (chunk: string) => {
+                    setAiResponse(prev => (prev || '') + chunk);
+                },
+                () => {
+                    setIsAiLoading(false);
+                },
+                (error: string) => {
+                    setAiResponse(`⚠️ ${error}`);
+                    setIsAiLoading(false);
+                }
             );
-            setAiResponse(result);
-        } catch (e: any) {
-            setAiResponse(`⚠️ ${e.message || 'AI error'}. Make sure Ollama is running (check Settings).`);
-        } finally {
-            setIsAiLoading(false);
+        } else {
+            // Local fallback simulation (for browser dev)
+            setTimeout(() => {
+                setAiResponse("Stardust concepts expand beyond the known universe. [Simulated Response in Browser Mode]");
+                setIsAiLoading(false);
+            }, 1000);
         }
     };
 
@@ -87,20 +106,37 @@ export const EditorOverlay: React.FC = () => {
                 </div>
             </div>
 
-            {/* AI Response */}
+            {/* AI Response Panel */}
             {aiResponse && (
-                <div className="mx-3 mt-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl text-sm text-purple-100 leading-relaxed max-h-40 overflow-y-auto">
-                    <div className="flex items-center gap-1.5 mb-1">
-                        <Sparkles size={10} className="text-purple-400" />
-                        <span className="text-purple-400 text-[10px] uppercase font-semibold tracking-wider">AI Insight</span>
-                        <button
-                            onClick={() => setAiResponse(null)}
-                            className="ml-auto text-purple-400/60 hover:text-purple-300"
-                        >
-                            <X size={10} />
-                        </button>
+                <div className="bg-slate-800/90 border-b border-purple-500/20 p-3 shadow-inner relative max-h-48 overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2 sticky top-0 bg-slate-800/90 py-1 z-10">
+                        <div className="flex items-center gap-1.5">
+                            <Sparkles size={12} className="text-purple-400" />
+                            <span className="text-purple-400 text-xs font-semibold tracking-wider flex items-center gap-2">
+                                AI SPARK
+                                {isAiLoading && <Loader size={10} className="animate-spin opacity-50" />}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(aiResponse);
+                                }}
+                                className="text-xs text-purple-300 hover:text-white hover:bg-white/10 px-2 py-1 rounded transition-colors"
+                            >
+                                Copy
+                            </button>
+                            <button
+                                onClick={() => setAiResponse(null)}
+                                className="text-slate-400 hover:text-white p-1 rounded hover:bg-white/10 transition-colors"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
                     </div>
-                    {aiResponse}
+                    <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap select-text">
+                        {aiResponse}
+                    </div>
                 </div>
             )}
 

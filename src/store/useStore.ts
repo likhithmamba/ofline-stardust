@@ -31,6 +31,9 @@ type State = {
     isSettingsOpen: boolean;
     isHelpOpen: boolean;
     isSearchOpen: boolean;
+    isExportOpen: boolean;
+    isAutoConnectOpen: boolean;
+    isHistoryOpen: boolean;
     addNote: (n: Note) => void;
     updateNote: (id: string, patch: Partial<Note>) => void;
     deleteNote: (id: string) => void;
@@ -41,6 +44,9 @@ type State = {
     setSettingsOpen: (isOpen: boolean) => void;
     setHelpOpen: (isOpen: boolean) => void;
     setSearchOpen: (isOpen: boolean) => void;
+    setExportOpen: (isOpen: boolean) => void;
+    setAutoConnectOpen: (isOpen: boolean) => void;
+    setHistoryOpen: (isOpen: boolean) => void;
     setNotes: (notes: Note[]) => void;
     setConnections: (connections: Connection[]) => void;
     focusModeId?: string;
@@ -64,6 +70,9 @@ export const useStore = create<State>((set, get) => ({
     isSettingsOpen: false,
     isHelpOpen: false,
     isSearchOpen: false,
+    isExportOpen: false,
+    isAutoConnectOpen: false,
+    isHistoryOpen: false,
     addNote: (n) => {
         set((s) => ({ notes: [...s.notes, n] }));
         saveDataToDB(get().notes, get().connections);
@@ -99,6 +108,9 @@ export const useStore = create<State>((set, get) => ({
     setSettingsOpen: (isOpen) => set({ isSettingsOpen: isOpen }),
     setHelpOpen: (isOpen) => set({ isHelpOpen: isOpen }),
     setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
+    setExportOpen: (isOpen) => set({ isExportOpen: isOpen }),
+    setAutoConnectOpen: (isOpen) => set({ isAutoConnectOpen: isOpen }),
+    setHistoryOpen: (isOpen) => set({ isHistoryOpen: isOpen }),
     setNotes: (notes) => {
         set({ notes });
         saveDataToDB(notes, get().connections);
@@ -119,12 +131,15 @@ export const useStore = create<State>((set, get) => ({
 
 // Debounce save
 let saveTimeout: ReturnType<typeof setTimeout>;
+let lastBackupTime = 0;
+const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
 const saveDataToDB = (notes: Note[], connections: Connection[]) => {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(async () => {
         try {
             const db = await initDB();
-            const tx = db.transaction(['notes', 'connections'], 'readwrite');
+            const tx = db.transaction(['notes', 'connections', 'backups'], 'readwrite');
 
             const noteStore = tx.objectStore('notes');
             await noteStore.clear();
@@ -136,6 +151,18 @@ const saveDataToDB = (notes: Note[], connections: Connection[]) => {
             await connStore.clear();
             for (const conn of connections) {
                 await connStore.put(conn);
+            }
+
+            // Create a snapshot backup every 5 minutes
+            const now = Date.now();
+            if (now - lastBackupTime > BACKUP_INTERVAL && notes.length > 0) {
+                const backupStore = tx.objectStore('backups');
+                await backupStore.add({
+                    timestamp: now,
+                    notes: JSON.parse(JSON.stringify(notes)), // Deep copy to prevent mutation issues
+                    connections: JSON.parse(JSON.stringify(connections))
+                });
+                lastBackupTime = now;
             }
 
             await tx.done;

@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { useStore } from '../store/useStore';
 import { EditorOverlay } from './EditorOverlay';
-import { Toolbar } from './Toolbar';
 import { MiniMap } from './MiniMap';
 import { SettingsPanel } from './SettingsPanel';
 import { soundManager } from '../utils/sound';
@@ -11,11 +10,15 @@ import { PlanetNote } from './PlanetNote';
 import { ConnectionLayer } from './ConnectionLayer';
 import { CreationMenu } from './CreationMenu';
 import { BlackHole } from './BlackHole';
+import { NoteContextMenu } from './NoteContextMenu';
 import { AIChatPanel } from './AIChatPanel';
 import { OllamaStatusBar } from './OllamaStatusBar';
 import { HelpModal } from './HelpModal';
 import { SearchBar } from './SearchBar';
 import { NOTE_STYLES, NoteType } from '../constants';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import { TagFilter } from './TagFilter';
+import { FocusMode } from './FocusMode';
 
 export const CanvasViewport: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -37,6 +40,16 @@ export const CanvasViewport: React.FC = () => {
 
     // Interaction State
     const [creationMenu, setCreationMenu] = useState<{ isOpen: boolean; x: number; y: number; worldX: number; worldY: number } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ isOpen: boolean; x: number; y: number; noteId: string } | null>(null);
+    // Tag Filter State
+    const [isTagFilterOpen, setIsTagFilterOpen] = useState(false);
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+    const handleToggleTag = (tag: string) => {
+        setSelectedTags(prev =>
+            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
+    };
     const [connectionStart, setConnectionStart] = useState<{ id: string; x: number; y: number } | null>(null);
     const [tempConnectionEnd, setTempConnectionEnd] = useState<{ x: number; y: number } | null>(null);
     const [blackHoleActive, setBlackHoleActive] = useState(false);
@@ -155,33 +168,8 @@ export const CanvasViewport: React.FC = () => {
     }, [viewport]);
 
     // Keyboard shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Delete selected note
-            if (e.key === 'Delete' && selectedId) {
-                soundManager.playWarp();
-                deleteNote(selectedId);
-            }
-            // Escape: deselect / close panels
-            if (e.key === 'Escape') {
-                if (isSearchOpen) {
-                    setSearchOpen(false);
-                } else if (isHelpOpen) {
-                    setHelpOpen(false);
-                } else if (selectedId) {
-                    setSelectedId(undefined);
-                }
-            }
-            // Ctrl+K: Open search
-            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                e.preventDefault();
-                setSearchOpen(!isSearchOpen);
-            }
-        };
+    useKeyboardShortcuts();
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedId, isSearchOpen, isHelpOpen, deleteNote, setSelectedId, setSearchOpen, setHelpOpen]);
 
     // Gestures for Viewport
     useGesture({
@@ -305,6 +293,43 @@ export const CanvasViewport: React.FC = () => {
         return () => window.removeEventListener('pointerup', handleUp);
     }, [connectionStart, notes, viewport, addConnection]);
 
+    // Global keyboard and context menu listeners
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isSearchOpen || isHelpOpen) return;
+
+            if (e.key === 'Escape') {
+                setSelectedId(undefined);
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedId) {
+                    deleteNote(selectedId);
+                    setSelectedId(undefined);
+                }
+            } else if (e.key === 'f' || e.key === 'F') {
+                setSearchOpen(true);
+            } else if (e.key === '?') {
+                setHelpOpen(true);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+
+        const handleContextMenuEvent = (e: any) => {
+            setContextMenu({
+                isOpen: true,
+                x: e.detail.x,
+                y: e.detail.y,
+                noteId: e.detail.noteId
+            });
+        };
+        window.addEventListener('showNoteContextMenu', handleContextMenuEvent);
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('showNoteContextMenu', handleContextMenuEvent);
+        };
+    }, [selectedId, isSearchOpen, isHelpOpen, deleteNote, setSelectedId, setSearchOpen, setHelpOpen]);
+
 
     return (
         <div ref={containerRef} className="w-full h-screen overflow-hidden relative bg-slate-950 touch-none select-none">
@@ -331,20 +356,27 @@ export const CanvasViewport: React.FC = () => {
 
                 {/* Notes Layer */}
                 <div className="pointer-events-auto">
-                    {notes.map(note => (
-                        <PlanetNote
-                            key={note.id}
-                            note={note}
-                            isSelected={selectedId === note.id}
-                            zoom={viewport.zoom}
-                            onConnectStart={(id, x, y) => {
-                                setConnectionStart({ id, x, y });
-                                setTempConnectionEnd({ x, y });
-                            }}
-                            onDrag={handleNoteDrag}
-                            onDragEnd={handleNoteDragEnd}
-                        />
-                    ))}
+                    {notes.map(note => {
+                        // Check if note matches active tag filters
+                        const isFaded = selectedTags.length > 0 &&
+                            (!note.tags || !selectedTags.some(t => note.tags!.includes(t)));
+
+                        return (
+                            <PlanetNote
+                                key={note.id}
+                                note={note}
+                                isSelected={selectedId === note.id}
+                                isFaded={isFaded}
+                                zoom={viewport.zoom}
+                                onConnectStart={(id, x, y) => {
+                                    setConnectionStart({ id, x, y });
+                                    setTempConnectionEnd({ x, y });
+                                }}
+                                onDrag={handleNoteDrag}
+                                onDragEnd={handleNoteDragEnd}
+                            />
+                        );
+                    })}
                 </div>
             </motion.div>
 
@@ -373,19 +405,29 @@ export const CanvasViewport: React.FC = () => {
                 }}
             />
 
+            {contextMenu?.isOpen && (
+                <NoteContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    noteId={contextMenu.noteId}
+                    onClose={() => setContextMenu(null)}
+                />
+            )}
+
             <EditorOverlay />
-            <Toolbar
-                onAIChatToggle={() => setIsAIChatOpen(v => !v)}
-                isAIChatOpen={isAIChatOpen}
-                onHelpToggle={() => setHelpOpen(!isHelpOpen)}
-                onSearchToggle={() => setSearchOpen(!isSearchOpen)}
-            />
             <MiniMap />
             <SettingsPanel />
             <AIChatPanel isOpen={isAIChatOpen} onClose={() => setIsAIChatOpen(false)} />
             <OllamaStatusBar />
             <HelpModal isOpen={isHelpOpen} onClose={() => setHelpOpen(false)} />
             <SearchBar isOpen={isSearchOpen} onClose={() => setSearchOpen(false)} />
+            <TagFilter
+                isOpen={isTagFilterOpen}
+                onClose={() => setIsTagFilterOpen(false)}
+                selectedTags={selectedTags}
+                onToggleTag={handleToggleTag}
+            />
+            <FocusMode />
 
             {/* App Label */}
             <div className="absolute top-4 left-4 text-white/20 pointer-events-none font-light tracking-[0.2em] text-xs uppercase z-50" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>

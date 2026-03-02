@@ -8,6 +8,7 @@ import clsx from 'clsx';
 interface PlanetNoteProps {
     note: Note;
     isSelected: boolean;
+    isFaded?: boolean;
     zoom: number;
     onConnectStart: (id: string, x: number, y: number) => void;
     onDrag?: (id: string, x: number, y: number) => void;
@@ -25,7 +26,7 @@ const REAL_SIZES: Record<string, number> = {
     [NoteType.Galaxy]: 500,
 };
 
-export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, onConnectStart, onDrag, onDragEnd }) => {
+export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, isFaded, zoom, onConnectStart, onDrag, onDragEnd }) => {
     const updateNote = useStore((state) => state.updateNote);
     const setSelectedId = useStore((state) => state.setSelectedId);
     const scaleMode = useStore((state) => state.scaleMode);
@@ -66,6 +67,21 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, 
     }, {
         drag: { filterTaps: true },
     });
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Dispatch custom event to CanvasViewport to show menu
+        const event = new CustomEvent('showNoteContextMenu', {
+            detail: {
+                x: e.clientX,
+                y: e.clientY,
+                noteId: note.id
+            }
+        });
+        window.dispatchEvent(event);
+    };
 
     const handleBlur = () => {
         setIsEditing(false);
@@ -117,7 +133,8 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, 
             className={clsx(
                 "note-planet",
                 `planet-${note.type}`,
-                style.className
+                style.className,
+                isFaded && "opacity-10 grayscale-[50%] pointer-events-none transition-opacity duration-300"
             )}
             style={{
                 '--planet-size': `${size}px`,
@@ -131,7 +148,7 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, 
                 width: size,
                 height: size,
                 scale: 1,
-                opacity: 1
+                opacity: isFaded ? 0.1 : 1
             }}
             transition={{
                 x: { duration: 0 },
@@ -142,6 +159,7 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, 
                 opacity: { duration: 0.3 }
             }}
             title={`${style.label}${note.title ? ': ' + note.title : ''}`}
+            onContextMenu={handleContextMenu}
         >
             {/* Selection Pulse Ring */}
             {isSelected && (
@@ -198,6 +216,17 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, zoom, 
             >
                 {note.title || style.label}
             </div>
+
+            {/* Tags */}
+            {note.tags && note.tags.length > 0 && !isEditing && (
+                <div className="absolute top-[105%] left-1/2 -translate-x-1/2 flex gap-1 justify-center whitespace-nowrap opacity-70 group-hover:opacity-100 transition-opacity">
+                    {note.tags.map((tag, i) => (
+                        <span key={i} className="bg-slate-900 border border-slate-700 text-slate-300 text-[9px] px-1.5 py-0.5 rounded-full shadow-lg">
+                            #{tag}
+                        </span>
+                    ))}
+                </div>
+            )}
 
             {/* Connection Handles */}
             {renderHandle('top')}

@@ -1,27 +1,35 @@
+
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import {
     Plus, Trash2, Upload, Download, Map, Search,
-    Share2, HelpCircle, Layout, Sparkles, Settings
+    Share2, HelpCircle, Layout, Sparkles, Settings, Network, History, Filter
 } from 'lucide-react';
 import { NoteType } from '../constants';
-import { exportCanvasToJSON } from '../utils/export';
+
 
 interface ToolbarProps {
     onAIChatToggle: () => void;
     isAIChatOpen: boolean;
     onHelpToggle: () => void;
     onSearchToggle: () => void;
+    isTagFilterOpen: boolean;
+    onTagFilterToggle: () => void;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, onHelpToggle, onSearchToggle }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, onHelpToggle, onSearchToggle,
+    isTagFilterOpen, onTagFilterToggle
+}) => {
     const addNote = useStore((state) => state.addNote);
     const notes = useStore((state) => state.notes);
-    const viewport = useStore((state) => state.viewport);
     const setNotes = useStore((state) => state.setNotes);
+    const viewport = useStore((state) => state.viewport);
     const setConnections = useStore((state) => state.setConnections);
-    const connections = useStore((state) => state.connections);
+
     const setSettingsOpen = useStore((state) => state.setSettingsOpen);
+    const setExportOpen = useStore((state) => state.setExportOpen);
+    const setAutoConnectOpen = useStore((state) => state.setAutoConnectOpen);
+    const setHistoryOpen = useStore((state) => state.setHistoryOpen);
 
     const showMinimap = useStore((state) => state.showMinimap);
     const setShowMinimap = useStore((state) => state.setShowMinimap);
@@ -53,15 +61,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
 
     const handleExport = () => {
         if (notes.length === 0) return;
-        // Export both notes and connections
-        const data = JSON.stringify({ notes, connections }, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `stardust-export-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        setExportOpen(true);
     };
 
     const handleImport = () => {
@@ -98,7 +98,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
     const Button = ({ onClick, icon: Icon, title, active, badge }: any) => (
         <button
             onClick={onClick}
-            className={`p-2 rounded-lg transition-all hover:bg-white/10 relative ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'}`}
+            className={`p - 2 rounded - lg transition - all hover: bg - white / 10 relative ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'} `}
             title={title}
         >
             <Icon size={18} />
@@ -129,18 +129,42 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
 
                 <Button onClick={() => setShowMinimap(!showMinimap)} icon={Map} active={showMinimap} title="Toggle Minimap" />
                 <Button onClick={() => setShowConnections(!showConnections)} icon={Share2} active={showConnections} title="Toggle Connections" />
-                <Button onClick={() => setScaleMode(scaleMode === 'real' ? 'compact' : 'real')} icon={Layout} active={scaleMode === 'real'} title={`Scale Mode: ${scaleMode}`} />
+                <Button onClick={() => setScaleMode(scaleMode === 'real' ? 'compact' : 'real')} icon={Layout} active={scaleMode === 'real'} title={`Scale Mode: ${scaleMode} `} />
 
-                <div className="w-px h-4 bg-white/10 mx-1" />
-
-                {/* AI Chat Toggle */}
-                <button
-                    onClick={onAIChatToggle}
-                    className={`p-2 rounded-lg transition-all ${isAIChatOpen ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/20 hover:text-purple-300'}`}
-                    title="AI Chat (local Ollama)"
-                >
-                    <Sparkles size={18} />
-                </button>
+                {/* Actions */}
+                <div className="flex items-center gap-1 border-r border-white/5 pr-2 mr-2">
+                    <button
+                        onClick={onTagFilterToggle}
+                        className={`p-2 rounded-lg transition-colors flex items-center gap-2 ${isTagFilterOpen ? 'text-purple-400 bg-white/10' : 'text-slate-400 hover:text-purple-400 hover:bg-white/5'
+                            }`}
+                        title="Filter by Tags"
+                    >
+                        <Filter size={18} />
+                    </button>
+                    <button
+                        onClick={() => setHistoryOpen(true)}
+                        className="p-2 text-slate-400 hover:text-purple-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2"
+                        title="Canvas History (Snapshots)"
+                    >
+                        <History size={18} />
+                    </button>
+                    <button
+                        onClick={() => setAutoConnectOpen(true)}
+                        className="p-2 text-slate-400 hover:text-purple-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 group relative"
+                        title="AI Semantic Connect"
+                    >
+                        <Network size={18} className="group-hover:animate-pulse" />
+                        <span className="hidden lg:inline text-sm font-medium">Auto-Connect</span>
+                        <div className="absolute top-0 right-1 w-1.5 h-1.5 bg-purple-500 rounded-full animate-ping" />
+                    </button>
+                    <button
+                        onClick={onAIChatToggle}
+                        className={`p - 2 rounded - lg transition - all ${isAIChatOpen ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/20 hover:text-purple-300'} `}
+                        title="AI Chat (local Ollama)"
+                    >
+                        <Sparkles size={18} />
+                    </button>
+                </div>
 
                 {/* Settings */}
                 <Button onClick={() => setSettingsOpen(true)} icon={Settings} title="Settings & AI Model" />

@@ -1,5 +1,4 @@
 
-]
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
@@ -240,6 +239,59 @@ ipcMain.handle('ollama:chat', async (_event, { model, messages }) => {
     req.write(body);
     req.end();
   });
+});
+
+ipcMain.on('ollama:stream', (_event, { model, prompt, messages, channel }) => {
+  const isChat = !!messages;
+  const endpoint = isChat ? '/api/chat' : '/api/generate';
+  const body = JSON.stringify({
+    model,
+    ...(isChat ? { messages } : { prompt }),
+    stream: true,
+    options: { temperature: 0.7, num_predict: 800 }
+  });
+
+  const req = http.request({
+    hostname: 'localhost',
+    port: 11434,
+    path: endpoint,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    },
+    timeout: 120000,
+  }, (res) => {
+    res.on('data', chunk => {
+      try {
+        const lines = chunk.toString().split('\n').filter(l => l.trim().length > 0);
+        for (const line of lines) {
+          const json = JSON.parse(line);
+          const text = isChat ? (json.message?.content || '') : (json.response || '');
+          _event.sender.send(`${channel}:chunk`, text);
+          if (json.done) {
+            _event.sender.send(`${channel}:done`, { success: true });
+          }
+        }
+      } catch (e) {
+        // Ignore partial chunk parsing errors, NdJSON safe line split above is robust
+      }
+    });
+
+    res.on('end', () => { });
+  });
+
+  req.on('error', (err) => {
+    _event.sender.send(`${channel}:error`, `Ollama stream error: ${err.message}`);
+  });
+
+  req.on('timeout', () => {
+    req.destroy();
+    _event.sender.send(`${channel}:error`, 'Ollama stream request timed out');
+  });
+
+  req.write(body);
+  req.end();
 });
 
 ipcMain.handle('ollama:pull', async (_event, { model }) => {
