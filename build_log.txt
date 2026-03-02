@@ -1,0 +1,6 @@
+src/components/BlackHole.tsx(1,17): error TS6133: 'useState' is declared but its value is never read.
+src/components/BlackHole.tsx(1,27): error TS6133: 'useEffect' is declared but its value is never read.
+src/components/BlackHole.tsx(3,1): error TS6133: 'useStore' is declared but its value is never read.
+src/components/BlackHole.tsx(11,11): error TS6133: 'controls' is declared but its value is never read.
+src/components/Toolbar.tsx(20,13): error TS2322: Type '"galaxy" | "star" | "planet"' is not assignable to type 'NoteType'.
+  Type '"star"' is not assignable to type 'NoteType'.
