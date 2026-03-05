@@ -10,7 +10,18 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-electron
+build
 *.local
+
+# Temp/build output files
+build_log*.txt
+build_output.txt
+git_output.txt
+merge_output.txt
+report_text.txt
+typecheck_output*.txt
+read_docx.py
 
 # Editor directories and files
 .vscode/*
