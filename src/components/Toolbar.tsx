@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
+import { useNoteStore } from '../store/useNoteStore';
 import {
     Plus, Trash2, Upload, Download, Map, Search,
     Share2, HelpCircle, Layout, Sparkles, Settings, Network, History, Filter
@@ -15,16 +16,19 @@ interface ToolbarProps {
     onSearchToggle: () => void;
     isTagFilterOpen: boolean;
     onTagFilterToggle: () => void;
+    noteId?: string; // ID of the currently editing note, if any
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, onHelpToggle, onSearchToggle,
-    isTagFilterOpen, onTagFilterToggle
+    isTagFilterOpen, onTagFilterToggle, noteId
 }) => {
     const addNote = useStore((state) => state.addNote);
     const notes = useStore((state) => state.notes);
     const setNotes = useStore((state) => state.setNotes);
     const viewport = useStore((state) => state.viewport);
     const setConnections = useStore((state) => state.setConnections);
+
+    const addBidirectionalConnection = useNoteStore((state) => state.addBidirectionalConnection);
 
     const setSettingsOpen = useStore((state) => state.setSettingsOpen);
     const setExportOpen = useStore((state) => state.setExportOpen);
@@ -43,13 +47,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
     const handleAddDefault = () => {
         const x = -viewport.x / viewport.zoom + window.innerWidth / (2 * viewport.zoom) - 100;
         const y = -viewport.y / viewport.zoom + window.innerHeight / (2 * viewport.zoom) - 50;
+        const newId = Math.random().toString(36).substr(2, 9);
         addNote({
-            id: Math.random().toString(36).substr(2, 9),
+            id: newId,
             x, y, w: 240, h: 120,
             type: NoteType.Earth,
             title: 'New Planet',
             color: '#0ea5e9'
         });
+        // If we're editing a note, auto-connect the new note to it
+        if (noteId) {
+            addBidirectionalConnection(noteId, newId);
+        }
     };
 
     const handleClear = () => {

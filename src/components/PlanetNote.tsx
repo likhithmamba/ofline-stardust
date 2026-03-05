@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useGesture } from '@use-gesture/react';
 import { useStore, type Note } from '../store/useStore';
+import { useNoteStore } from '../store/useNoteStore';
 import { NOTE_STYLES, NoteType } from '../constants';
 import { motion } from 'framer-motion';
 import clsx from 'clsx';
@@ -31,16 +32,43 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
     const setSelectedId = useStore((state) => state.setSelectedId);
     const scaleMode = useStore((state) => state.scaleMode);
 
+    const editingNoteId = useNoteStore((state) => state.editingNoteId);
+    const setEditingNote = useNoteStore((state) => state.setEditingNote);
+    const noteMeta = useNoteStore((state) => state.getNoteMeta(note.id));
+
     const noteRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const style = NOTE_STYLES[note.type] || NOTE_STYLES[NoteType.Asteroid];
-    const [isEditing, setIsEditing] = useState(false);
+    const isEditing = editingNoteId === note.id;
+    const isMinimized = noteMeta.isMinimized;
 
     // Compute Size
     const size = scaleMode === 'real'
         ? (REAL_SIZES[note.type] || 64)
         : style.width;
+
+    // ─── KEYBOARD CAPTURE PHASE ──────────────────────────────────────────
+    // When this note is in edit mode, intercept ALL keydown events in capture phase
+    // to prevent canvas shortcuts (Delete, Backspace, etc.) from firing.
+    useEffect(() => {
+        if (!isEditing) return;
+
+        const handler = (e: KeyboardEvent) => {
+            // Allow Escape to exit edit mode, but still stop propagation
+            if (e.key === 'Escape') {
+                setEditingNote(null);
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+            }
+            // Stop ALL other keydown events from reaching canvas handlers
+            e.stopPropagation();
+        };
+
+        document.addEventListener('keydown', handler, true); // capture phase
+        return () => document.removeEventListener('keydown', handler, true);
+    }, [isEditing, setEditingNote]);
 
     const bind = useGesture({
         onDrag: ({ delta: [dx, dy], event, last }) => {
@@ -72,7 +100,6 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
         e.preventDefault();
         e.stopPropagation();
 
-        // Dispatch custom event to CanvasViewport to show menu
         const event = new CustomEvent('showNoteContextMenu', {
             detail: {
                 x: e.clientX,
@@ -84,19 +111,21 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
     };
 
     const handleBlur = () => {
-        setIsEditing(false);
         if (contentRef.current) {
             updateNote(note.id, { title: contentRef.current.innerText });
         }
     };
 
-    const handleContentClick = (e: React.MouseEvent) => {
+    const handleDoubleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIsEditing(true);
+        // Set this note as being edited — this opens the EditorOverlay with the Lexical editor
+        setSelectedId(note.id);
+        setEditingNote(note.id);
+
+        // Also focus the inline title for quick edits on the planet itself
         setTimeout(() => {
             if (contentRef.current) {
                 contentRef.current.focus();
-                // Place cursor at end
                 const range = document.createRange();
                 const sel = window.getSelection();
                 if (contentRef.current.childNodes.length > 0) {
@@ -126,6 +155,49 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
         );
     };
 
+    // ─── MINIMIZED PILL STATE ────────────────────────────────────────────
+    if (isMinimized) {
+        return (
+            <motion.div
+                ref={noteRef}
+                {...(bind() as any)}
+                className={clsx(
+                    "note-planet minimized-pill",
+                    isFaded && "opacity-10 grayscale-[50%] pointer-events-none"
+                )}
+                style={{
+                    position: 'absolute',
+                    borderRadius: '9999px',
+                    padding: '4px 12px',
+                    background: `linear-gradient(135deg, ${style.color}40, ${style.color}20)`,
+                    border: `1px solid ${style.color}50`,
+                    backdropFilter: 'blur(8px)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                }}
+                animate={{
+                    x: note.x,
+                    y: note.y,
+                    scale: 1,
+                    opacity: isFaded ? 0.1 : 0.8,
+                }}
+                transition={{
+                    x: { duration: 0 },
+                    y: { duration: 0 },
+                    scale: { type: 'spring', stiffness: 200, damping: 20 },
+                }}
+                onDoubleClick={() => {
+                    useNoteStore.getState().toggleMinimize(note.id);
+                }}
+                title={`${note.title || style.label} (minimized — double-click to expand)`}
+            >
+                <span className="text-white/70 text-xs font-medium">
+                    {note.title || style.label}
+                </span>
+            </motion.div>
+        );
+    }
+
     return (
         <motion.div
             ref={noteRef}
@@ -134,6 +206,7 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
                 "note-planet",
                 `planet-${note.type}`,
                 style.className,
+                isEditing && "ring-2 ring-purple-400/60",
                 isFaded && "opacity-10 grayscale-[50%] pointer-events-none transition-opacity duration-300"
             )}
             style={{
@@ -160,10 +233,7 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
             }}
             title={`${style.label}${note.title ? ': ' + note.title : ''}`}
             onContextMenu={handleContextMenu}
-            onDoubleClick={(e) => {
-                e.stopPropagation();
-                handleContentClick(e as any);
-            }}
+            onDoubleClick={handleDoubleClick}
         >
             {/* Selection Pulse Ring */}
             {isSelected && (
@@ -197,14 +267,18 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
                 contentEditable={isEditing}
                 suppressContentEditableWarning
                 onBlur={handleBlur}
-                onClick={handleContentClick}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (isEditing) return; // Already editing, don't re-trigger
+                    setSelectedId(note.id);
+                }}
                 onPointerDown={(e) => isEditing && e.stopPropagation()}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
                         contentRef.current?.blur();
                     }
-                    e.stopPropagation(); // Prevent Delete key from deleting note while editing
+                    e.stopPropagation();
                 }}
                 style={{
                     fontSize: `clamp(10px, calc(${size}px / 12), 48px)`,

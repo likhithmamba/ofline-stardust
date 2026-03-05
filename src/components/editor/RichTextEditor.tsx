@@ -17,6 +17,8 @@ import { ListPlugin } from '@lexical/react/LexicalListPlugin';
 import type { EditorState } from 'lexical';
 
 import exampleTheme from './EditorTheme';
+import { MentionNode } from './MentionNode';
+import { MentionPlugin } from './MentionPlugin';
 
 const editorConfig = {
     namespace: 'StardustEditor',
@@ -32,19 +34,28 @@ const editorConfig = {
         CodeNode,
         CodeHighlightNode,
         AutoLinkNode,
-        LinkNode
+        LinkNode,
+        MentionNode,
     ]
 };
 
 interface RichTextEditorProps {
     initialContent?: string;
     onChange: (editorState: EditorState) => void;
+    editable?: boolean;
+    noteId?: string;
 }
 
-export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent, onChange }) => {
+export const RichTextEditor: React.FC<RichTextEditorProps> = ({
+    initialContent,
+    onChange,
+    editable = true,
+    noteId,
+}) => {
     const initialConfig = {
         ...editorConfig,
-        editorState: initialContent || undefined
+        editorState: initialContent || undefined,
+        editable,
     };
 
     return (
@@ -53,15 +64,16 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({ initialContent, 
                 <div className="editor-inner flex-1 relative overflow-auto">
                     <RichTextPlugin
                         contentEditable={<ContentEditable className="editor-input h-full outline-none p-4 text-sm leading-relaxed" />}
-                        placeholder={<div className="editor-placeholder">Start typing... Use markdown shortcuts (# for heading, &gt; for quote, * for bold)</div>}
+                        placeholder={<div className="editor-placeholder">Start typing... Use @ to mention notes, markdown shortcuts (# for heading, &gt; for quote, * for bold)</div>}
                         ErrorBoundary={LexicalErrorBoundary}
                     />
                     <HistoryPlugin />
-                    <AutoFocusPlugin />
+                    {editable && <AutoFocusPlugin />}
                     <ListPlugin />
                     <LinkPlugin />
                     <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
                     <OnChangePlugin onChange={onChange} />
+                    {noteId && <MentionPlugin currentNoteId={noteId} />}
                 </div>
             </div>
         </LexicalComposer>

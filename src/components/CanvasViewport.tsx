@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useGesture } from '@use-gesture/react';
 import { useStore } from '../store/useStore';
+import { useNoteStore } from '../store/useNoteStore';
 import { EditorOverlay } from './EditorOverlay';
 import { MiniMap } from './MiniMap';
 import { SettingsPanel } from './SettingsPanel';
@@ -31,13 +32,20 @@ export const CanvasViewport: React.FC = () => {
     const setViewport = useStore((state) => state.setViewport);
     const addNote = useStore((state) => state.addNote);
     const addConnection = useStore((state) => state.addConnection);
-    const deleteNote = useStore((state) => state.deleteNote);
     const selectedId = useStore((state) => state.selectedId);
     const setSelectedId = useStore((state) => state.setSelectedId);
     const isHelpOpen = useStore((state) => state.isHelpOpen);
     const setHelpOpen = useStore((state) => state.setHelpOpen);
     const isSearchOpen = useStore((state) => state.isSearchOpen);
     const setSearchOpen = useStore((state) => state.setSearchOpen);
+
+    // Note Store
+    const editingNoteId = useNoteStore((state) => state.editingNoteId);
+    const setEditingNote = useNoteStore((state) => state.setEditingNote);
+    const toastMessage = useNoteStore((state) => state.toastMessage);
+    const pendingDeletion = useNoteStore((state) => state.pendingDeletion);
+    const undoDelete = useNoteStore((state) => state.undoDelete);
+    const safeDeleteNote = useNoteStore((state) => state.safeDeleteNote);
 
     // Interaction State
     const [creationMenu, setCreationMenu] = useState<{ isOpen: boolean; x: number; y: number; worldX: number; worldY: number } | null>(null);
@@ -204,6 +212,10 @@ export const CanvasViewport: React.FC = () => {
         onPointerDown: ({ event }) => {
             if ((event.target as HTMLElement).tagName === 'CANVAS') {
                 setSelectedId(undefined);
+                // Clear editing state when clicking on canvas background
+                if (editingNoteId) {
+                    setEditingNote(null);
+                }
             }
         },
         onDoubleClick: ({ event }) => {
@@ -252,10 +264,11 @@ export const CanvasViewport: React.FC = () => {
     const handleNoteDragEnd = useCallback((id: string) => {
         if (blackHoleActive) {
             soundManager.playWarp();
-            deleteNote(id);
+            // Use safe delete with undo toast instead of immediate deletion
+            safeDeleteNote(id);
             setBlackHoleActive(false);
         }
-    }, [blackHoleActive, deleteNote]);
+    }, [blackHoleActive, safeDeleteNote]);
 
     const handleConnectStart = useCallback((id: string, x: number, y: number) => {
         setConnectionStart({ id, x, y });
@@ -307,8 +320,9 @@ export const CanvasViewport: React.FC = () => {
             if (e.key === 'Escape') {
                 setSelectedId(undefined);
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (selectedId) {
-                    deleteNote(selectedId);
+                if (selectedId && !editingNoteId) {
+                    // Use safe delete with undo toast
+                    safeDeleteNote(selectedId);
                     setSelectedId(undefined);
                 }
             } else if (e.key === 'f' || e.key === 'F') {
@@ -334,7 +348,7 @@ export const CanvasViewport: React.FC = () => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('showNoteContextMenu', handleContextMenuEvent);
         };
-    }, [selectedId, isSearchOpen, isHelpOpen, deleteNote, setSelectedId, setSearchOpen, setHelpOpen]);
+    }, [selectedId, editingNoteId, isSearchOpen, isHelpOpen, safeDeleteNote, setSelectedId, setSearchOpen, setHelpOpen]);
 
 
     return (
@@ -438,12 +452,29 @@ export const CanvasViewport: React.FC = () => {
                 onSearchToggle={() => setSearchOpen(true)}
                 isTagFilterOpen={isTagFilterOpen}
                 onTagFilterToggle={() => setIsTagFilterOpen(!isTagFilterOpen)}
+                noteId={editingNoteId || undefined}
             />
 
             {/* App Label */}
             <div className="absolute top-4 left-4 text-white/20 pointer-events-none font-light tracking-[0.2em] text-xs uppercase z-50" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 Stardust <span className="text-[10px] opacity-40">v2.0</span>
             </div>
+
+            {/* Toast Notification (for deletion undo) */}
+            {toastMessage && (
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-5 py-3 rounded-full shadow-2xl border border-white/10"
+                    style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(16px)' }}>
+                    <span className="text-white/80 text-sm">{toastMessage}</span>
+                    {pendingDeletion && (
+                        <button
+                            onClick={undoDelete}
+                            className="text-purple-400 hover:text-purple-300 text-sm font-semibold px-2 py-1 rounded-lg hover:bg-white/10 transition-colors"
+                        >
+                            Undo
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

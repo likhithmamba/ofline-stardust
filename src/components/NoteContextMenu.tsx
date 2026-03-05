@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Edit2, Copy, Trash2, Link2, Tag, Palette, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useNoteStore } from '../store/useNoteStore';
 import { NoteType, NOTE_STYLES } from '../constants';
 
 interface NoteContextMenuProps {
@@ -16,7 +17,10 @@ export const NoteContextMenu: React.FC<NoteContextMenuProps> = ({ x, y, noteId, 
     const setSelectedId = useStore(state => state.setSelectedId);
     const addNote = useStore(state => state.addNote);
     const updateNote = useStore(state => state.updateNote);
-    const deleteNote = useStore(state => state.deleteNote);
+
+    const setEditingNote = useNoteStore(state => state.setEditingNote);
+    const safeDeleteNote = useNoteStore(state => state.safeDeleteNote);
+    const toggleMinimize = useNoteStore(state => state.toggleMinimize);
 
     const [showTypeMenu, setShowTypeMenu] = React.useState(false);
     const [showTagMenu, setShowTagMenu] = React.useState(false);
@@ -26,6 +30,7 @@ export const NoteContextMenu: React.FC<NoteContextMenuProps> = ({ x, y, noteId, 
 
     const handleEdit = () => {
         setSelectedId(noteId);
+        setEditingNote(noteId);
         onClose();
     };
 
@@ -40,9 +45,7 @@ export const NoteContextMenu: React.FC<NoteContextMenuProps> = ({ x, y, noteId, 
     };
 
     const handleDelete = () => {
-        if (!note.content || confirm('Delete this note?')) {
-            deleteNote(noteId);
-        }
+        safeDeleteNote(noteId);
         onClose();
     };
 
@@ -98,6 +101,7 @@ export const NoteContextMenu: React.FC<NoteContextMenuProps> = ({ x, y, noteId, 
 
                         <div className="h-px bg-slate-700/50 my-1 mx-2" />
 
+                        <MenuItem icon={Copy} label="Minimize" onClick={() => { toggleMinimize(noteId); onClose(); }} />
                         <MenuItem icon={Trash2} label="Delete" onClick={handleDelete} className="text-red-400 hover:text-red-300 hover:bg-red-400/10" />
                     </>
                 ) : showTypeMenu ? (
