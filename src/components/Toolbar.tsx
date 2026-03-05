@@ -98,7 +98,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
     const Button = ({ onClick, icon: Icon, title, active, badge }: any) => (
         <button
             onClick={onClick}
-            className={`p - 2 rounded - lg transition - all hover: bg - white / 10 relative ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'} `}
+            className={`p-2 rounded-lg transition-all hover:bg-white/10 relative ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'}`}
             title={title}
         >
             <Icon size={18} />
@@ -159,7 +159,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
                     </button>
                     <button
                         onClick={onAIChatToggle}
-                        className={`p - 2 rounded - lg transition - all ${isAIChatOpen ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/20 hover:text-purple-300'} `}
+                        className={`p-2 rounded-lg transition-all ${isAIChatOpen ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/20 hover:text-purple-300'}`}
                         title="AI Chat (local Ollama)"
                     >
                         <Sparkles size={18} />

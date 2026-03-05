@@ -26,7 +26,7 @@ const REAL_SIZES: Record<string, number> = {
     [NoteType.Galaxy]: 500,
 };
 
-export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, isFaded, zoom, onConnectStart, onDrag, onDragEnd }) => {
+export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isFaded, zoom, onConnectStart, onDrag, onDragEnd }: PlanetNoteProps) {
     const updateNote = useStore((state) => state.updateNote);
     const setSelectedId = useStore((state) => state.setSelectedId);
     const scaleMode = useStore((state) => state.scaleMode);
@@ -160,6 +160,10 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, isFade
             }}
             title={`${style.label}${note.title ? ': ' + note.title : ''}`}
             onContextMenu={handleContextMenu}
+            onDoubleClick={(e) => {
+                e.stopPropagation();
+                handleContentClick(e as any);
+            }}
         >
             {/* Selection Pulse Ring */}
             {isSelected && (
@@ -235,4 +239,4 @@ export const PlanetNote: React.FC<PlanetNoteProps> = ({ note, isSelected, isFade
             {renderHandle('left')}
         </motion.div>
     );
-};
+});

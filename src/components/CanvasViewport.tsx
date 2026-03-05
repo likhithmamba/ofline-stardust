@@ -19,6 +19,7 @@ import { NOTE_STYLES, NoteType } from '../constants';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { TagFilter } from './TagFilter';
 import { FocusMode } from './FocusMode';
+import { Toolbar } from './Toolbar';
 
 export const CanvasViewport: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -256,6 +257,11 @@ export const CanvasViewport: React.FC = () => {
         }
     }, [blackHoleActive, deleteNote]);
 
+    const handleConnectStart = useCallback((id: string, x: number, y: number) => {
+        setConnectionStart({ id, x, y });
+        setTempConnectionEnd({ x, y });
+    }, []);
+
     // Global pointer up for connections
     useEffect(() => {
         const handleUp = (e: PointerEvent) => {
@@ -368,10 +374,7 @@ export const CanvasViewport: React.FC = () => {
                                 isSelected={selectedId === note.id}
                                 isFaded={isFaded}
                                 zoom={viewport.zoom}
-                                onConnectStart={(id, x, y) => {
-                                    setConnectionStart({ id, x, y });
-                                    setTempConnectionEnd({ x, y });
-                                }}
+                                onConnectStart={handleConnectStart}
                                 onDrag={handleNoteDrag}
                                 onDragEnd={handleNoteDragEnd}
                             />
@@ -428,6 +431,14 @@ export const CanvasViewport: React.FC = () => {
                 onToggleTag={handleToggleTag}
             />
             <FocusMode />
+            <Toolbar
+                onAIChatToggle={() => setIsAIChatOpen(!isAIChatOpen)}
+                isAIChatOpen={isAIChatOpen}
+                onHelpToggle={() => setHelpOpen(true)}
+                onSearchToggle={() => setSearchOpen(true)}
+                isTagFilterOpen={isTagFilterOpen}
+                onTagFilterToggle={() => setIsTagFilterOpen(!isTagFilterOpen)}
+            />
 
             {/* App Label */}
             <div className="absolute top-4 left-4 text-white/20 pointer-events-none font-light tracking-[0.2em] text-xs uppercase z-50" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
