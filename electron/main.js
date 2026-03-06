@@ -31,7 +31,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -47,9 +47,17 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Open external links in real browser
+  // Open external links in real browser securely
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      const parsedUrl = new URL(url);
+      const safeProtocols = ['http:', 'https:', 'mailto:'];
+      if (safeProtocols.includes(parsedUrl.protocol)) {
+        shell.openExternal(url);
+      }
+    } catch (e) {
+      // Ignore invalid URLs
+    }
     return { action: 'deny' };
   });
 
