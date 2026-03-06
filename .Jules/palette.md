@@ -1,0 +1,3 @@
+## 2025-02-14 - Toolbar Accessibility Improvement
+**Learning:** Found that custom `Button` components and standalone icon-only buttons in `src/components/Toolbar.tsx` were missing `aria-label`s, although they had `title` attributes. While `title` can act as a fallback, explicit `aria-label`s are the standard for robust screen reader support on icon-only interactive elements.
+**Action:** Applied `aria-label` to all icon-only buttons in the toolbar. Next time, always check if custom wrapper components like `Button` correctly pass down accessibility attributes or infer them from existing props like `title`.
