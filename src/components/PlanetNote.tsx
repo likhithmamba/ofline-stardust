@@ -34,14 +34,13 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
 
     const editingNoteId = useNoteStore((state) => state.editingNoteId);
     const setEditingNote = useNoteStore((state) => state.setEditingNote);
-    const noteMeta = useNoteStore((state) => state.getNoteMeta(note.id));
+    const isMinimized = useNoteStore((state) => state.noteMeta[note.id]?.isMinimized ?? false);
 
     const noteRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
     const style = NOTE_STYLES[note.type] || NOTE_STYLES[NoteType.Asteroid];
     const isEditing = editingNoteId === note.id;
-    const isMinimized = noteMeta.isMinimized;
 
     // Compute Size
     const size = scaleMode === 'real'

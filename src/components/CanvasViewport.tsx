@@ -251,15 +251,16 @@ export const CanvasViewport: React.FC = () => {
 
     // Handle Note Drag for Black Hole detection
     const handleNoteDrag = useCallback((_id: string, x: number, y: number) => {
-        const screenX = x * viewport.zoom + viewport.x;
-        const screenY = y * viewport.zoom + viewport.y;
+        const currentViewport = useStore.getState().viewport;
+        const screenX = x * currentViewport.zoom + currentViewport.x;
+        const screenY = y * currentViewport.zoom + currentViewport.y;
 
         const bhX = window.innerWidth - 100;
         const bhY = window.innerHeight - 100;
 
         const dist = Math.sqrt(Math.pow(screenX - bhX, 2) + Math.pow(screenY - bhY, 2));
         setBlackHoleActive(dist < 200);
-    }, [viewport]);
+    }, []);
 
     const handleNoteDragEnd = useCallback((id: string) => {
         if (blackHoleActive) {

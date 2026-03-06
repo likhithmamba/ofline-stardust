@@ -20,7 +20,7 @@ const REAL_SIZES: Record<string, number> = {
     [NoteType.Galaxy]: 500,
 };
 
-export const ConnectionLayer: React.FC<ConnectionLayerProps> = ({ connections, notes, tempConnection }) => {
+export const ConnectionLayer: React.FC<ConnectionLayerProps> = React.memo(({ connections, notes, tempConnection }) => {
     const scaleMode = useStore((state) => state.scaleMode);
     const showConnections = useStore((state) => state.showConnections);
     const removeConnection = useStore((state) => state.removeConnection);
@@ -128,4 +128,4 @@ export const ConnectionLayer: React.FC<ConnectionLayerProps> = ({ connections, n
             })()}
         </svg>
     );
-};
+});

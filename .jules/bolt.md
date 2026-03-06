@@ -1,0 +1,7 @@
+## 2024-05-24 - Zustand Selectors and Object References
+**Learning:** Using a Zustand selector that calls a getter function which returns an object or a default object (e.g., `state.getNoteMeta(id)`) breaks React's equality check. This causes the component to re-render on *every* store update, even if the relevant data hasn't changed, because a new object reference is created each time.
+**Action:** Always select primitive values directly from the state object in Zustand selectors (e.g., `state.noteMeta[id]?.isMinimized ?? false`) to maintain referential equality and prevent unnecessary re-renders.
+
+## 2024-05-24 - Stale Closures vs. Re-renders in Drag Handlers
+**Learning:** Including frequently changing global state (like a canvas `viewport`) in the dependency array of a `useCallback` used for drag events causes the callback reference to change constantly. This breaks `React.memo` on child components receiving the callback, leading to massive cascading re-renders during panning/dragging.
+**Action:** For event handlers that need the *current* value of rapidly changing state but don't need to trigger a re-render themselves when that state changes, read the state directly within the callback using `store.getState()` instead of including it in the hook's dependency array.
