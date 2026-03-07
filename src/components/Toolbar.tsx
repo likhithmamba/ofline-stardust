@@ -109,6 +109,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
             onClick={onClick}
             className={`p-2 rounded-lg transition-all hover:bg-white/10 relative ${active ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'}`}
             title={title}
+            aria-label={title}
+            aria-pressed={active}
         >
             <Icon size={18} />
             {badge && (
@@ -147,6 +149,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
                         className={`p-2 rounded-lg transition-colors flex items-center gap-2 ${isTagFilterOpen ? 'text-purple-400 bg-white/10' : 'text-slate-400 hover:text-purple-400 hover:bg-white/5'
                             }`}
                         title="Filter by Tags"
+                        aria-label="Filter by Tags"
+                        aria-pressed={isTagFilterOpen}
                     >
                         <Filter size={18} />
                     </button>
@@ -154,6 +158,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
                         onClick={() => setHistoryOpen(true)}
                         className="p-2 text-slate-400 hover:text-purple-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2"
                         title="Canvas History (Snapshots)"
+                        aria-label="Canvas History (Snapshots)"
                     >
                         <History size={18} />
                     </button>
@@ -161,6 +166,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
                         onClick={() => setAutoConnectOpen(true)}
                         className="p-2 text-slate-400 hover:text-purple-400 hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2 group relative"
                         title="AI Semantic Connect"
+                        aria-label="AI Semantic Connect"
                     >
                         <Network size={18} className="group-hover:animate-pulse" />
                         <span className="hidden lg:inline text-sm font-medium">Auto-Connect</span>
@@ -170,6 +176,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAIChatToggle, isAIChatOpen, 
                         onClick={onAIChatToggle}
                         className={`p-2 rounded-lg transition-all ${isAIChatOpen ? 'bg-purple-600 text-white' : 'text-purple-400 hover:bg-purple-600/20 hover:text-purple-300'}`}
                         title="AI Chat (local Ollama)"
+                        aria-label="AI Chat (local Ollama)"
+                        aria-pressed={isAIChatOpen}
                     >
                         <Sparkles size={18} />
                     </button>
