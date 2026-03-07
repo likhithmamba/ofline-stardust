@@ -114,6 +114,7 @@
     "cross-env": "^7.0.3",
     "electron": "^32.2.7",
     "electron-builder": "^25.1.8",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
     "typescript": "~5.9.3",
