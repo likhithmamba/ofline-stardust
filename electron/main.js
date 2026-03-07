@@ -1,5 +1,5 @@
 
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
@@ -31,13 +31,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // ✅ SENTINEL FIX: sandbox must be false when preload uses require('electron')
+      // contextBridge + ipcRenderer work correctly without sandbox.
+      // If you migrate preload to ESM / no-require, set this to true.
       sandbox: false,
     },
   });
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
-    // Only open devtools if explicitly requested
     if (process.env.DEVTOOLS === '1') {
       mainWindow.webContents.openDevTools({ mode: 'detach' });
     }
@@ -47,24 +49,32 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Open external links in real browser (with security validation)
+  // ✅ SENTINEL FIX: Only open safe protocols in external browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsedUrl = new URL(url);
-      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+      const safeProtocols = ['http:', 'https:', 'mailto:'];
+      if (safeProtocols.includes(parsedUrl.protocol)) {
         shell.openExternal(url);
-      } else {
-        console.warn(`[Security] Blocked attempt to open unsafe URL: ${url}`);
       }
-    } catch (e) {
-      console.warn(`[Security] Blocked attempt to open invalid URL: ${url}`);
+    } catch {
+      // Ignore malformed URLs
     }
     return { action: 'deny' };
   });
 
+  // ✅ SENTINEL FIX: Validate URL before opening in shell throughout the app
+  mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+    const parsedUrl = new URL(navigationUrl);
+    // In production, block navigation away from file:// or localhost
+    if (!isDev && parsedUrl.protocol !== 'file:') {
+      event.preventDefault();
+    }
+  });
+
   // Notify renderer that we're in Electron (for title bar spacing)
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.executeJavaScript(
+    mainWindow?.webContents.executeJavaScript(
       `document.body.classList.add('electron-app')`
     );
   });
@@ -73,9 +83,11 @@ function createWindow() {
 // ─── Ollama Helpers ───────────────────────────────────────────────────────────
 function isOllamaRunning() {
   return new Promise((resolve) => {
-    http.get(`${OLLAMA_BASE_URL}/api/tags`, (res) => {
+    const req = http.get(`${OLLAMA_BASE_URL}/api/tags`, (res) => {
       resolve(res.statusCode === 200);
-    }).on('error', () => resolve(false));
+    });
+    req.on('error', () => resolve(false));
+    req.setTimeout(3000, () => { req.destroy(); resolve(false); });
   });
 }
 
@@ -98,7 +110,6 @@ function getOllamaModels() {
 
 function startOllama() {
   return new Promise((resolve) => {
-    // Try to find ollama in common locations
     const locations = [
       'ollama',
       'C:\\Program Files\\Ollama\\ollama.exe',
@@ -122,7 +133,6 @@ function startOllama() {
         ollamaProcess.on('error', () => tryNext(i + 1));
         ollamaProcess.on('spawn', () => {
           console.log('Ollama started via:', locations[i]);
-          // Wait for it to be ready
           let attempts = 0;
           const check = setInterval(async () => {
             attempts++;
@@ -198,10 +208,10 @@ ipcMain.handle('ollama:generate', async (_event, { model, prompt }) => {
       });
     });
 
-    req.on('error', (err) => reject(new Error(`Ollama connection error: ${err.message}`)));
+    req.on('error', (err) => resolve({ text: '', error: `Ollama connection error: ${err.message}` }));
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('Ollama request timed out (2 min)'));
+      resolve({ text: '', error: 'Ollama request timed out (2 min)' });
     });
     req.write(body);
     req.end();
@@ -209,7 +219,7 @@ ipcMain.handle('ollama:generate', async (_event, { model, prompt }) => {
 });
 
 ipcMain.handle('ollama:chat', async (_event, { model, messages }) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const body = JSON.stringify({
       model,
       messages,
@@ -235,15 +245,15 @@ ipcMain.handle('ollama:chat', async (_event, { model, messages }) => {
           const json = JSON.parse(data);
           resolve({ text: json.message?.content || '', error: null });
         } catch {
-          reject(new Error('Failed to parse Ollama chat response'));
+          resolve({ text: '', error: 'Failed to parse Ollama chat response' });
         }
       });
     });
 
-    req.on('error', (err) => reject(new Error(`Ollama connection error: ${err.message}`)));
+    req.on('error', (err) => resolve({ text: '', error: `Ollama connection error: ${err.message}` }));
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('Ollama chat request timed out (2 min)'));
+      resolve({ text: '', error: 'Ollama chat request timed out (2 min)' });
     });
     req.write(body);
     req.end();
@@ -271,23 +281,37 @@ ipcMain.on('ollama:stream', (_event, { model, prompt, messages, channel }) => {
     },
     timeout: 120000,
   }, (res) => {
+    let buffer = '';
     res.on('data', chunk => {
-      try {
-        const lines = chunk.toString().split('\n').filter(l => l.trim().length > 0);
-        for (const line of lines) {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
           const json = JSON.parse(line);
           const text = isChat ? (json.message?.content || '') : (json.response || '');
-          _event.sender.send(`${channel}:chunk`, text);
+          if (text) _event.sender.send(`${channel}:chunk`, text);
           if (json.done) {
             _event.sender.send(`${channel}:done`, { success: true });
           }
+        } catch {
+          // Ignore partial JSON parse errors
         }
-      } catch (e) {
-        // Ignore partial chunk parsing errors, NdJSON safe line split above is robust
       }
     });
 
-    res.on('end', () => { });
+    res.on('end', () => {
+      // Flush any remaining buffer
+      if (buffer.trim()) {
+        try {
+          const json = JSON.parse(buffer);
+          const text = isChat ? (json.message?.content || '') : (json.response || '');
+          if (text) _event.sender.send(`${channel}:chunk`, text);
+        } catch { }
+      }
+      _event.sender.send(`${channel}:done`, { success: true });
+    });
   });
 
   req.on('error', (err) => {
@@ -324,20 +348,39 @@ ipcMain.handle('ollama:pull', async (_event, { model }) => {
   });
 });
 
+// ✅ SENTINEL FIX: Validate URL before opening external links via IPC
 ipcMain.handle('app:openOllamaDownload', () => {
-  // Hardcoded HTTPS URL is safe
+  // Hardcoded safe URL — no user input involved
   shell.openExternal('https://ollama.com/download');
 });
 
 ipcMain.handle('app:showDialog', async (_event, options) => {
+  if (!mainWindow) return;
   return dialog.showMessageBox(mainWindow, options);
 });
 
 // ─── App Lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  // P3: Content Security Policy header
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self'; " +
+          "script-src 'self'; " +
+          "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+          "font-src 'self' https://fonts.gstatic.com; " +
+          "img-src 'self' data: blob:; " +
+          "connect-src 'self' http://localhost:11434 ws://localhost:*; " +
+          "worker-src 'self' blob:;"
+        ],
+      },
+    });
+  });
+
   createWindow();
 
-  // Try to auto-start Ollama
   const running = await isOllamaRunning();
   if (!running) {
     console.log('Ollama not running, attempting auto-start...');

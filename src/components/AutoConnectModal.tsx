@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Sparkles, Check, Link as LinkIcon, Loader } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -19,19 +19,26 @@ export const AutoConnectModal: React.FC<AutoConnectModalProps> = ({ isOpen, onCl
     const [isLoading, setIsLoading] = useState(false);
     const [suggestions, setSuggestions] = useState<SemanticLink[]>([]);
     const [error, setError] = useState<string | null>(null);
+    // P2 FIX: AbortController for cancelling AI analysis
+    const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         if (!isOpen) {
             setSuggestions([]);
             setError(null);
+            // Cancel any in-flight request when modal closes
+            abortRef.current?.abort();
             return;
         }
 
         const fetchSuggestions = async () => {
             setIsLoading(true);
             setError(null);
+            abortRef.current = new AbortController();
             try {
                 const links = await suggestConnections(notes);
+                // Check if aborted during fetch
+                if (abortRef.current?.signal.aborted) return;
                 // Filter out links that already exist
                 const newLinks = links.filter(link => {
                     const exists = existingConnections.some(c =>
@@ -47,6 +54,7 @@ export const AutoConnectModal: React.FC<AutoConnectModalProps> = ({ isOpen, onCl
                     setSuggestions(newLinks);
                 }
             } catch (err: any) {
+                if (err.name === 'AbortError') return;
                 setError(err.message || 'Failed to analyze connections.');
             } finally {
                 setIsLoading(false);
@@ -94,6 +102,17 @@ export const AutoConnectModal: React.FC<AutoConnectModalProps> = ({ isOpen, onCl
                             <div className="flex flex-col items-center justify-center py-10 space-y-4">
                                 <Loader size={32} className="text-purple-500 animate-spin" />
                                 <p className="text-slate-400 text-sm animate-pulse">Analyzing canvas semantics...</p>
+                                {/* P2 FIX: Abort button during AI analysis */}
+                                <button
+                                    onClick={() => {
+                                        abortRef.current?.abort();
+                                        setIsLoading(false);
+                                        setError('Analysis cancelled.');
+                                    }}
+                                    className="mt-2 px-4 py-1.5 text-xs text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition-colors"
+                                >
+                                    Cancel
+                                </button>
                             </div>
                         ) : error ? (
                             <div className="text-center py-8">

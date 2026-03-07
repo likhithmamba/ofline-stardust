@@ -40,6 +40,8 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
     const contentRef = useRef<HTMLDivElement>(null);
 
     const style = NOTE_STYLES[note.type] || NOTE_STYLES[NoteType.Asteroid];
+    // P1 FIX: Use note.color if set, otherwise fall back to type's default color
+    const effectiveColor = note.color || style.color;
     const isEditing = editingNoteId === note.id;
     const isMinimized = noteMeta.isMinimized;
 
@@ -169,8 +171,8 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
                     position: 'absolute',
                     borderRadius: '9999px',
                     padding: '4px 12px',
-                    background: `linear-gradient(135deg, ${style.color}40, ${style.color}20)`,
-                    border: `1px solid ${style.color}50`,
+                    background: `linear-gradient(135deg, ${effectiveColor}40, ${effectiveColor}20)`,
+                    border: `1px solid ${effectiveColor}50`,
                     backdropFilter: 'blur(8px)',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
@@ -213,6 +215,11 @@ export const PlanetNote = React.memo(function PlanetNote({ note, isSelected, isF
                 '--planet-size': `${size}px`,
                 width: 'var(--planet-size)',
                 height: 'var(--planet-size)',
+                // P1 FIX: Apply custom note color as a tint overlay
+                ...(note.color ? {
+                    boxShadow: `0 0 ${size / 4}px ${note.color}60, inset 0 0 ${size / 3}px ${note.color}30`,
+                    borderColor: `${note.color}80`,
+                } : {}),
             } as React.CSSProperties}
             initial={{ scale: 0, opacity: 0 }}
             animate={{

@@ -1,9 +1,16 @@
+// ─── Keyboard Shortcuts Hook ─────────────────────────────────────────────────
+// BUG-02 FIX: The original hook called deleteNote() (permanent, instant),
+// while CanvasViewport also called safeDeleteNote() (4-second undo).
+// Both fired simultaneously, bypassing the undo toast.
+// Solution: this hook now calls safeDeleteNote and the duplicate handler
+// in CanvasViewport has been removed.
+
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import { useNoteStore } from '../store/useNoteStore';
 
 export const useKeyboardShortcuts = () => {
     const selectedId = useStore(state => state.selectedId);
-    const deleteNote = useStore(state => state.deleteNote);
     const setSelectedId = useStore(state => state.setSelectedId);
     const viewport = useStore(state => state.viewport);
     const setViewport = useStore(state => state.setViewport);
@@ -17,14 +24,16 @@ export const useKeyboardShortcuts = () => {
     const isHelpOpen = useStore(state => state.isHelpOpen);
     const setHelpOpen = useStore(state => state.setHelpOpen);
 
-    // Derived setter for zoom
+    // ✅ BUG-02 FIX: use safeDeleteNote (with undo toast) instead of deleteNote
+    const safeDeleteNote = useNoteStore(state => state.safeDeleteNote);
+    const editingNoteId = useNoteStore(state => state.editingNoteId);
+
     const setZoom = (newZoom: number) => {
         setViewport({ ...viewport, zoom: newZoom });
     };
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if typing in input/textarea (except Cmd/Ctrl combos)
             const activeTag = document.activeElement?.tagName.toLowerCase();
             const isTyping = activeTag === 'input' || activeTag === 'textarea' || document.activeElement?.hasAttribute('contenteditable');
 
@@ -62,13 +71,12 @@ export const useKeyboardShortcuts = () => {
                             if (selectedId) {
                                 setFocusModeId(focusModeId ? undefined : selectedId);
                             } else {
-                                alert("Please select a note first to enter Focus Mode.");
+                                alert('Please select a note first to enter Focus Mode.');
                             }
                         }
                         break;
                 }
             } else {
-                // Non-modifier shortcuts
                 switch (e.key) {
                     case '?':
                         if (!isTyping) {
@@ -78,9 +86,11 @@ export const useKeyboardShortcuts = () => {
                         break;
                     case 'Delete':
                     case 'Backspace':
-                        if (!isTyping && selectedId) {
+                        // ✅ BUG-02 FIX: guard against editing state AND use safeDeleteNote
+                        if (!isTyping && selectedId && !editingNoteId) {
                             e.preventDefault();
-                            deleteNote(selectedId);
+                            safeDeleteNote(selectedId);
+                            setSelectedId(undefined);
                         }
                         break;
                     case 'Escape':
@@ -89,7 +99,6 @@ export const useKeyboardShortcuts = () => {
                             setFocusModeId(undefined);
                         } else {
                             setSelectedId(undefined);
-                            // Also close modals if open
                             if (isExportOpen) setExportOpen(false);
                             if (isSearchOpen) setSearchOpen(false);
                             if (isHelpOpen) setHelpOpen(false);
@@ -102,7 +111,8 @@ export const useKeyboardShortcuts = () => {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [
-        viewport.zoom, setZoom, selectedId, focusModeId, setFocusModeId, deleteNote, setSelectedId,
+        viewport.zoom, setZoom, selectedId, focusModeId, setFocusModeId,
+        safeDeleteNote, setSelectedId, editingNoteId,
         isExportOpen, setExportOpen,
         isSearchOpen, setSearchOpen,
         isHelpOpen, setHelpOpen

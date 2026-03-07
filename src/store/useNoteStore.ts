@@ -208,6 +208,31 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
                 metaRecord[m.id] = m;
             }
             set({ noteMeta: metaRecord, isLoaded: true });
+
+            // P3: Orphan cleanup — remove metadata for notes that no longer exist
+            // Wait a tick for useStore to finish loading its notes
+            setTimeout(() => {
+                const mainNotes = useStore.getState().notes;
+                const noteIds = new Set(mainNotes.map(n => n.id));
+                const orphanIds = allMeta
+                    .filter(m => !noteIds.has(m.id))
+                    .map(m => m.id);
+
+                if (orphanIds.length > 0) {
+                    console.log(`[useNoteStore] Cleaning up ${orphanIds.length} orphaned metadata entries`);
+                    for (const id of orphanIds) {
+                        deleteNoteMeta(id);
+                    }
+                    // Remove from state too
+                    set(state => {
+                        const cleaned = { ...state.noteMeta };
+                        for (const id of orphanIds) {
+                            delete cleaned[id];
+                        }
+                        return { noteMeta: cleaned };
+                    });
+                }
+            }, 1500); // Wait for main store to hydrate
         } catch (e) {
             console.error('[useNoteStore] Failed to load from DB:', e);
             set({ isLoaded: true }); // Still mark as loaded so UI renders

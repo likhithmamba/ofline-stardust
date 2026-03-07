@@ -9,6 +9,8 @@ export const FocusMode: React.FC = () => {
     const setFocusModeId = useStore(state => state.setFocusModeId);
     const notes = useStore(state => state.notes);
     const updateNote = useStore(state => state.updateNote);
+    const viewport = useStore(state => state.viewport);
+    const setViewport = useStore(state => state.setViewport);
 
     const activeNote = notes.find(n => n.id === focusModeId);
 
@@ -24,6 +26,20 @@ export const FocusMode: React.FC = () => {
             setWordCount(0);
         }
     }, [activeNote?.content]);
+
+    // P2 FIX: Pan viewport to center on focused note when entering focus mode
+    useEffect(() => {
+        if (activeNote) {
+            const screenW = window.innerWidth;
+            const screenH = window.innerHeight;
+            setViewport({
+                ...viewport,
+                x: -(activeNote.x * viewport.zoom - screenW / 2),
+                y: -(activeNote.y * viewport.zoom - screenH / 2),
+            });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusModeId]); // Only on focus mode change, not on every viewport update
 
     // Timer logic
     useEffect(() => {

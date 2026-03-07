@@ -83,8 +83,54 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
           }
         );
       } else {
-        const response = await chatWithAI(apiMessages);
-        setMessages(prev => [...prev, { role: 'assistant', content: response }]);
+        // P1 FIX: Streaming fallback for non-Electron (browser dev mode)
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+        try {
+          const res = await fetch('http://localhost:11434/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: getSelectedModel(),
+              messages: apiMessages,
+              stream: true,
+            }),
+          });
+          const reader = res.body?.getReader();
+          if (!reader) throw new Error('No response stream');
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              if (!line.trim()) continue;
+              try {
+                const json = JSON.parse(line);
+                const text = json.message?.content || '';
+                if (text) {
+                  setMessages(prev => {
+                    const newMsgs = [...prev];
+                    const lastMsg = newMsgs[newMsgs.length - 1];
+                    if (lastMsg.role === 'assistant') lastMsg.content += text;
+                    return newMsgs;
+                  });
+                }
+              } catch { /* skip partial JSON */ }
+            }
+          }
+        } catch {
+          // Fallback to non-streaming if streaming fails
+          const response = await chatWithAI(apiMessages);
+          setMessages(prev => {
+            const newMsgs = [...prev];
+            const lastMsg = newMsgs[newMsgs.length - 1];
+            if (lastMsg.role === 'assistant') lastMsg.content = response;
+            return newMsgs;
+          });
+        }
         setIsLoading(false);
       }
     } catch (err: any) {
@@ -135,8 +181,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({ isOpen, onClose }) => 
                   </div>
                 )}
                 <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${msg.role === 'user'
-                    ? 'bg-purple-600 text-white rounded-tr-sm'
-                    : 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-tl-sm shadow-sm'
+                  ? 'bg-purple-600 text-white rounded-tr-sm'
+                  : 'bg-slate-800 text-slate-200 border border-slate-700/50 rounded-tl-sm shadow-sm'
                   }`}>
                   {msg.content || (isLoading && i === messages.length - 1 ? (
                     <span className="flex items-center gap-2 text-slate-400">

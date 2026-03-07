@@ -4,31 +4,41 @@
   "private": true,
   "version": "2.0.0",
   "description": "Space-themed AI canvas notes app — offline with Ollama",
-  "author": "Stardust",
+  "author": {
+    "name": "Stardust",
+    "email": "support@stardust.app"
+  },
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
     "dev:renderer": "vite",
-    "dev:electron": "set NODE_ENV=development&& electron electron/main.js",
+    "dev:electron": "cross-env NODE_ENV=development electron electron/main.js",
     "dev": "concurrently \"npm run dev:renderer\" \"wait-on http://localhost:5173 && npm run dev:electron\"",
     "build:renderer": "vite build",
-    "build:electron": "npm run build:renderer && electron-builder",
-    "build": "npm run build:electron",
+    "build:win": "npm run build:renderer && electron-builder --win",
+    "build:mac": "npm run build:renderer && electron-builder --mac",
+    "build:linux": "npm run build:renderer && electron-builder --linux",
+    "build": "npm run build:win",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
   "build": {
     "appId": "com.stardust.offline",
     "productName": "Stardust",
+    "copyright": "Copyright © 2024 Stardust",
     "icon": "build/icon.png",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "build/**/*"
+      "build/**/*",
+      "!**/*.map",
+      "!**/node_modules/**"
     ],
+    "extraResources": [],
     "win": {
       "target": [
         {
@@ -36,26 +46,63 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "artifactName": "Stardust-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
+      "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Stardust"
+      "shortcutName": "Stardust",
+      "include": "build/installer.nsh",
+      "differentialPackage": false
+    },
+    "portable": {
+      "artifactName": "Stardust-Portable-${version}.${ext}"
     },
     "mac": {
-      "target": "dmg",
-      "category": "public.app-category.productivity"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "darkModeSupport": true,
+      "artifactName": "Stardust-${version}-${arch}.${ext}"
     },
     "linux": {
-      "target": "AppImage"
-    }
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "artifactName": "Stardust-${version}.${ext}"
+    },
+    "publish": null
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.17",
@@ -64,6 +111,7 @@
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
     "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
     "electron": "^32.2.7",
     "electron-builder": "^25.1.8",
     "postcss": "^8.5.6",

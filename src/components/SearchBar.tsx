@@ -18,11 +18,33 @@ export const SearchBar: React.FC<SearchBarProps> = ({ isOpen, onClose }) => {
     const setViewport = useStore(s => s.setViewport);
     const setSelectedId = useStore(s => s.setSelectedId);
 
-    const fuse = useMemo(() => new Fuse(notes, {
-        keys: ['title', 'type'],
+    // P2 FIX: Extend search to body text by extracting text from Lexical JSON
+    const notesWithBody = useMemo(() => notes.map(n => {
+        let bodyText = '';
+        if (n.content) {
+            try {
+                const parsed = JSON.parse(n.content);
+                // Recursively extract text from Lexical nodes
+                const extractText = (node: any): string => {
+                    let text = node.text || '';
+                    if (node.children) {
+                        text += node.children.map(extractText).join(' ');
+                    }
+                    return text;
+                };
+                bodyText = extractText(parsed.root || parsed);
+            } catch { /* content may not be JSON */
+                bodyText = n.content;
+            }
+        }
+        return { ...n, bodyText };
+    }), [notes]);
+
+    const fuse = useMemo(() => new Fuse(notesWithBody, {
+        keys: ['title', 'type', 'bodyText'],
         threshold: 0.4,
         includeScore: true,
-    }), [notes]);
+    }), [notesWithBody]);
 
     const results = query.trim()
         ? fuse.search(query).slice(0, 8).map(r => r.item)

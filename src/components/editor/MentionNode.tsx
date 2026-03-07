@@ -82,11 +82,13 @@ export class MentionNode extends DecoratorNode<React.ReactElement> {
     }
 
     decorate(): React.ReactElement {
+        const noteId = this.__noteId;
+        const noteTitle = this.__noteTitle;
         return React.createElement(
             'span',
             {
                 className: 'mention-node-rendered',
-                title: `Connected note: ${this.__noteTitle}`,
+                title: `Click to navigate: ${noteTitle}`,
                 style: {
                     background: 'rgba(139, 92, 246, 0.2)',
                     color: '#a78bfa',
@@ -98,8 +100,27 @@ export class MentionNode extends DecoratorNode<React.ReactElement> {
                     border: '1px solid rgba(139, 92, 246, 0.3)',
                     fontSize: '0.9em',
                 },
+                // P2 FIX: Click to navigate to mentioned note
+                onClick: (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Dynamic import to avoid circular deps
+                    import('../../store/useStore').then(({ useStore }) => {
+                        const { notes, viewport, setViewport, setSelectedId } = useStore.getState();
+                        const target = notes.find(n => n.id === noteId);
+                        if (!target) return;
+                        const screenW = window.innerWidth;
+                        const screenH = window.innerHeight;
+                        setViewport({
+                            ...viewport,
+                            x: -(target.x * viewport.zoom - screenW / 2),
+                            y: -(target.y * viewport.zoom - screenH / 2),
+                        });
+                        setSelectedId(noteId);
+                    });
+                },
             },
-            `@${this.__noteTitle}`
+            `@${noteTitle}`
         );
     }
 

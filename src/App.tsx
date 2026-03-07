@@ -1,10 +1,11 @@
-
 import { useEffect, useState } from 'react';
 import { CanvasViewport } from './components/CanvasViewport';
 import { useStore } from './store/useStore';
 import { useNoteStore } from './store/useNoteStore';
 import { AutoConnectModal } from './components/AutoConnectModal';
 import { HistoryPanel } from './components/HistoryPanel';
+import { ExportModal } from './components/ExportModal'; // ✅ BUG-01 FIX: was never imported
+import { ErrorBoundary } from './components/ErrorBoundary'; // P3: Error boundary
 
 function App() {
     const isAutoConnectOpen = useStore(s => s.isAutoConnectOpen);
@@ -12,6 +13,10 @@ function App() {
 
     const isHistoryOpen = useStore(s => s.isHistoryOpen);
     const setHistoryOpen = useStore(s => s.setHistoryOpen);
+
+    // ✅ BUG-01 FIX: ExportModal state was wired but modal never rendered
+    const isExportOpen = useStore(s => s.isExportOpen);
+    const setExportOpen = useStore(s => s.setExportOpen);
 
     const isLoaded = useNoteStore(s => s.isLoaded);
     const [initDone, setInitDone] = useState(false);
@@ -39,9 +44,13 @@ function App() {
 
     return (
         <>
-            <CanvasViewport />
+            <ErrorBoundary fallbackMessage="Canvas encountered an error">
+                <CanvasViewport />
+            </ErrorBoundary>
             <AutoConnectModal isOpen={isAutoConnectOpen} onClose={() => setAutoConnectOpen(false)} />
             <HistoryPanel isOpen={isHistoryOpen} onClose={() => setHistoryOpen(false)} />
+            {/* ✅ BUG-01 FIX: ExportModal now actually renders */}
+            <ExportModal isOpen={isExportOpen} onClose={() => setExportOpen(false)} />
         </>
     );
 }
