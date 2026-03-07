@@ -1,0 +1,5 @@
+## 2024-10-26 - Canvas Viewport Zustand Dependency Re-render Loop
+
+**Learning:** Including Zustand state variables like `viewport` in the dependency arrays of React hooks (`useEffect` and `useCallback`) within a parent component like `CanvasViewport` creates massive performance bottlenecks. When the canvas is panned or zoomed, `viewport` changes at 60fps, causing the `useEffect` animation frame loop to tear down and restart continuously, and breaking the function identity of callbacks like `handleNoteDrag`. This in turn breaks `React.memo` on deeply nested components like `PlanetNote`, forcing the entire tree to re-render synchronously with every pixel of mouse movement.
+
+**Action:** When a continuous render loop (`requestAnimationFrame`) or an interaction handler needs to read frequently-changing state but doesn't need to be reactive to it (or manages its own reactivity), fetch the state dynamically using `useStore.getState().variableName` instead of passing it into the dependency array. This guarantees stable function references and preserves memoization boundaries without sacrificing access to the latest state.
