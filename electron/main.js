@@ -47,9 +47,18 @@ function createWindow() {
 
   mainWindow.on('closed', () => { mainWindow = null; });
 
-  // Open external links in real browser
+  // Open external links in real browser (with security validation)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      const parsedUrl = new URL(url);
+      if (parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:') {
+        shell.openExternal(url);
+      } else {
+        console.warn(`[Security] Blocked attempt to open unsafe URL: ${url}`);
+      }
+    } catch (e) {
+      console.warn(`[Security] Blocked attempt to open invalid URL: ${url}`);
+    }
     return { action: 'deny' };
   });
 
@@ -316,6 +325,7 @@ ipcMain.handle('ollama:pull', async (_event, { model }) => {
 });
 
 ipcMain.handle('app:openOllamaDownload', () => {
+  // Hardcoded HTTPS URL is safe
   shell.openExternal('https://ollama.com/download');
 });
 
