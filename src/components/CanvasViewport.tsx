@@ -101,6 +101,7 @@ export const CanvasViewport: React.FC = () => {
 
         const render = () => {
             time += 0.01;
+            const currentViewport = useStore.getState().viewport;
             const { width, height } = canvas.getBoundingClientRect();
             const dpr = window.devicePixelRatio || 1;
             canvas.width = width * dpr;
@@ -118,8 +119,8 @@ export const CanvasViewport: React.FC = () => {
             // 2. Nebulas
             ctx.globalCompositeOperation = 'screen';
             nebulas.current.forEach(nebula => {
-                const parallaxX = (nebula.x - viewport.x * nebula.speed) % (width * 2);
-                const parallaxY = (nebula.y - viewport.y * nebula.speed) % (height * 2);
+                const parallaxX = (nebula.x - currentViewport.x * nebula.speed) % (width * 2);
+                const parallaxY = (nebula.y - currentViewport.y * nebula.speed) % (height * 2);
                 const drawX = parallaxX < -nebula.size ? parallaxX + width * 2 : parallaxX;
                 const drawY = parallaxY < -nebula.size ? parallaxY + height * 2 : parallaxY;
 
@@ -135,8 +136,8 @@ export const CanvasViewport: React.FC = () => {
 
             // 3. Stars with twinkling
             stars.current.forEach(star => {
-                const x = (star.x - viewport.x * star.speed) % (width * 3);
-                const y = (star.y - viewport.y * star.speed) % (height * 3);
+                const x = (star.x - currentViewport.x * star.speed) % (width * 3);
+                const y = (star.y - currentViewport.y * star.speed) % (height * 3);
                 const drawX = x < 0 ? x + width * 3 : x;
                 const drawY = y < 0 ? y + height * 3 : y;
 
@@ -153,10 +154,10 @@ export const CanvasViewport: React.FC = () => {
             // 4. Grid
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
             ctx.lineWidth = 1;
-            const gridSize = 100 * viewport.zoom;
+            const gridSize = 100 * currentViewport.zoom;
             if (gridSize > 20) { // Don't draw grid at very low zoom
-                const offsetX = (viewport.x % gridSize);
-                const offsetY = (viewport.y % gridSize);
+                const offsetX = (currentViewport.x % gridSize);
+                const offsetY = (currentViewport.y % gridSize);
                 ctx.beginPath();
                 for (let x = offsetX; x < width; x += gridSize) {
                     ctx.moveTo(x, 0);
@@ -174,7 +175,7 @@ export const CanvasViewport: React.FC = () => {
 
         render();
         return () => cancelAnimationFrame(animationFrameId);
-    }, [viewport]);
+    }, []);
 
     // Keyboard shortcuts
     useKeyboardShortcuts();
@@ -251,15 +252,16 @@ export const CanvasViewport: React.FC = () => {
 
     // Handle Note Drag for Black Hole detection
     const handleNoteDrag = useCallback((_id: string, x: number, y: number) => {
-        const screenX = x * viewport.zoom + viewport.x;
-        const screenY = y * viewport.zoom + viewport.y;
+        const currentViewport = useStore.getState().viewport;
+        const screenX = x * currentViewport.zoom + currentViewport.x;
+        const screenY = y * currentViewport.zoom + currentViewport.y;
 
         const bhX = window.innerWidth - 100;
         const bhY = window.innerHeight - 100;
 
         const dist = Math.sqrt(Math.pow(screenX - bhX, 2) + Math.pow(screenY - bhY, 2));
         setBlackHoleActive(dist < 200);
-    }, [viewport]);
+    }, []);
 
     const handleNoteDragEnd = useCallback((id: string) => {
         if (blackHoleActive) {
