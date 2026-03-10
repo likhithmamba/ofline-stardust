@@ -213,6 +213,12 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
             // Wait a tick for useStore to finish loading its notes
             setTimeout(() => {
                 const mainNotes = useStore.getState().notes;
+
+                // Guard: If notes aren't loaded yet or DB is just empty, don't wipe all metadata
+                if (mainNotes.length === 0) {
+                    return;
+                }
+
                 const noteIds = new Set(mainNotes.map(n => n.id));
                 const orphanIds = allMeta
                     .filter(m => !noteIds.has(m.id))
@@ -232,7 +238,7 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
                         return { noteMeta: cleaned };
                     });
                 }
-            }, 1500); // Wait for main store to hydrate
+            }, 5000); // Wait for main store to hydrate
         } catch (e) {
             console.error('[useNoteStore] Failed to load from DB:', e);
             set({ isLoaded: true }); // Still mark as loaded so UI renders

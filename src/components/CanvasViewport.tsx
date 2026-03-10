@@ -321,12 +321,6 @@ export const CanvasViewport: React.FC = () => {
 
             if (e.key === 'Escape') {
                 setSelectedId(undefined);
-            } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (selectedId && !editingNoteId) {
-                    // Use safe delete with undo toast
-                    safeDeleteNote(selectedId);
-                    setSelectedId(undefined);
-                }
             } else if (e.key === 'f' || e.key === 'F') {
                 setSearchOpen(true);
             } else if (e.key === '?') {

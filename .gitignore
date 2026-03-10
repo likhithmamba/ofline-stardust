@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 dist-electron
-build
+build/
 *.local
 
 # Temp/build output files
